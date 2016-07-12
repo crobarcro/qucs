@@ -48,6 +48,7 @@ public:
     void fillStates (void);
     void setMode (int);
     void setDelta (void);
+    nr_double_t suggestedDelta (void);
     void adjustDelta (nr_double_t);
     void adjustOrder (int reduce = 0);
     void initTR (void);

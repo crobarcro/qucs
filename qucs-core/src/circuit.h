@@ -57,6 +57,7 @@
 
 #include <map>
 #include <string>
+#include <limits>
 
 #include "integrator.h"
 #include "valuelist.h"
@@ -102,7 +103,7 @@ class circuit : public object, public integrator
  private:
   circuit * next;
   circuit * prev;
-  
+
  public:
   // constructor and destructor set
   circuit ();
@@ -220,6 +221,16 @@ class circuit : public object, public integrator
   void transientCapacitanceC2Q (int, int, int, nr_double_t, nr_double_t);
   void setDelta (nr_double_t * d) { deltas = d; }
   nr_double_t * getDelta (void) { return deltas; }
+  bool hasEvents (void) { return _hasEvents; };
+  /*! \fn suggestStep
+   * \brief Suggest next simulation time delta.
+   * \param t current simulation time
+   *
+   * Suggests a next simulation time step based on some event
+   * internal to the circuit. Will not be called if hasEvents is
+   * false.
+   */
+  virtual nr_double_t suggestStep (nr_double_t t) { return std::numeric_limits<nr_double_t>::max(); }
 
   // history specific functionality
   bool hasHistory (void) { return RETFLAG (CIRCUIT_HISTORY); }
@@ -335,6 +346,7 @@ class circuit : public object, public integrator
  protected:
   int type;
   int pol;
+  bool _hasEvents;
 
  private:
   int size;
@@ -368,6 +380,7 @@ class circuit : public object, public integrator
   nr_double_t * deltas;
   int nHistories;
   history * histories;
+
 };
 
 } // namespace qucs

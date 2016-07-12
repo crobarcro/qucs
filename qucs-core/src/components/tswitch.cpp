@@ -44,6 +44,7 @@ using namespace qucs;
 
 tswitch::tswitch () : circuit (2) {
   type = CIR_TSWITCH;
+  _hasEvents = true;
   setVoltageSources (1);
 }
 
@@ -161,14 +162,14 @@ void tswitch::calcTR (nr_double_t t) {
   } else {
     // calculate the time since the last switch occurred
     nr_double_t tdiff = std::max(NR_TINY, t - ts);
-    
+
     // set the time difference to be no more than the max switch
     // duration so when we interpolate below we only get the max
     // or min function value if we are past a switching time
     if (tdiff > duration) {
       tdiff = duration;
     }
-    // Set the appropriate resistance. 
+    // Set the appropriate resistance.
     if (on) {
       r_0 = roff;
       rdiff = ron - roff;
@@ -183,7 +184,7 @@ void tswitch::calcTR (nr_double_t t) {
       r = r_0 + rdiff * tdiff / duration;
     } else { // assume trans_type is "spline"
 	// the resistance is interpolated along a constrained cubic spline
-	// with zero derivative at the start and end points to ensure a 
+	// with zero derivative at the start and end points to ensure a
 	// smooth derivative
 	//r = r_0 + ((3. * s_i * qucs::pow (tdiff,2.0)) / (duration))
 	//        + ((-2. * s_i * qucs::pow (tdiff,3.0)) / qucs::pow (duration, 2.0));
@@ -197,6 +198,38 @@ void tswitch::calcTR (nr_double_t t) {
   assert(r <= roff);
 
   setD (VSRC_1, VSRC_1, -r);
+}
+
+nr_double_t tswitch::suggestStep (nr_double_t t)
+{
+  qucs::vector * values = getPropertyVector ("time");
+  nr_double_t ti = 0;
+  nr_double_t delta = std::numeric_limits<nr_double_t>::max();
+
+  if (repeat) {
+    // if the user enters an even number of switching times
+    // the pattern is repeated continuously. This is achieved by
+    // subtracting an integer number of total switching periods
+    // from the real time
+    t = t - (T * qucs::floor (t / T));
+  }
+
+  for (int i = 0; i < values->getSize (); i++) {
+    // add the current value from the list of switching times
+    // to a counter
+    ti += real (values->get (i));
+
+    if (ti > t)
+    {
+      // stop when the current time is less than the current
+      // sum of switching times
+      delta = ti - t;
+      break;
+    }
+  }
+
+  return delta;
+
 }
 
 // properties

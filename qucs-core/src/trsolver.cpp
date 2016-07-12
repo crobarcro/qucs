@@ -625,6 +625,14 @@ void trsolver::adjustDelta (nr_double_t t)
 {
     deltaOld = delta;
     delta = checkDelta ();
+    // check for smaller suggested delta by circuit components
+    nr_double_t delta_sugg = suggestedDelta ();
+    delta = std::min(delta, delta_sugg);
+    // the next suggested delta should act like a break point
+    // so we calculate the actual time referred to by the
+    // suggested delta
+    nr_double_t t_sugg = current + delta_sugg;
+
     if (delta > deltaMax) delta = deltaMax;
     if (delta < deltaMin) delta = deltaMin;
 
@@ -643,19 +651,20 @@ void trsolver::adjustDelta (nr_double_t t)
             }
             else
             {
-	      // check whether this step will bring too close to a breakpoint
-	      //   is ok if the step will go past the breakpoint, this is handled by
-	      //   the next branch
-	      if ((t - (current + delta) < deltaMin) && ((current + delta) < t))
+                // check whether this step will bring too close to a breakpoint
+                //   is ok if the step will go past the breakpoint, this is handled by
+                //   the next branch
+                if (  ( (t - (current + delta) < deltaMin) && ((current + delta) < t) )
+                   || ( (t_sugg - (current + delta) < deltaMin) && ((current + delta) < t_sugg)) )
                 {
                     // if we take this delta we will end up too close to the breakpoint
                     // and next step will be very tiny, possibly causing numerical issues
                     // so reduce it so that next step will likely not end up too close
                     // to the breakpoint
-                    delta /= 2.0; 
-		} 
+                    delta /= 2.0;
+                }
                 else
-	        {
+                {
                     if (delta > (t - current) && t > current)
                     {
                         // save last valid delta and set exact step
@@ -668,7 +677,7 @@ void trsolver::adjustDelta (nr_double_t t)
                         stepDelta = -1.0;
                     }
                 }
-	    }
+            }
             if (delta > deltaMax) delta = deltaMax;
             if (delta < deltaMin) delta = deltaMin;
         }
@@ -752,6 +761,33 @@ void trsolver::calcTR (trsolver * self)
     {
         c->calcTR (self->current);
     }
+}
+
+/* Goes through the list of circuit objects and gets the min
+   suggested delta. */
+nr_double_t trsolver::suggestedDelta ()
+{
+    nr_double_t deltamin = 0;
+    nr_double_t newdelta = 0;
+
+    circuit * root = subnet->getRoot ();
+    for (circuit * c = root; c != NULL; c = (circuit *) c->getNext ())
+    {
+        if (c->hasEvents())
+        {
+            newdelta = c->suggestStep(current);
+
+            if (newdelta > 0)
+            {
+                if ((deltamin == 0) || (newdelta < deltamin))
+                {
+                    deltamin = newdelta;
+                }
+            }
+        }
+    }
+
+    return deltamin;
 }
 
 /* Goes through the list of non-linear circuit objects and runs its
@@ -884,7 +920,11 @@ void trsolver::saveAllResults (nr_double_t time)
 
 /* This function is meant to adapt the current time-step the transient
    analysis advanced.  For the computation of the new time-step the
-   truncation error depending on the integration method is used. */
+   truncation error depending on the integration method is used.
+
+   It will also check the circuit elements which have events for
+   smaller suggested deltas
+*/
 nr_double_t trsolver::checkDelta (void)
 {
     nr_double_t LTEreltol = getPropertyDouble ("LTEreltol");
@@ -926,6 +966,7 @@ nr_double_t trsolver::checkDelta (void)
               "error h = %.3e\n", (double) n);
 #endif
     delta = std::min ((n > 1.9 * delta) ? 2 * delta : delta, n);
+
     return delta;
 }
 

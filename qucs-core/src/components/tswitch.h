@@ -36,6 +36,7 @@ class tswitch : public qucs::circuit
   void calcTR (nr_double_t);
   void calcNoiseAC (nr_double_t);
   void calcNoiseSP (nr_double_t);
+  nr_double_t suggestStep (nr_double_t);
 
  private:
   nr_double_t initState (void);
