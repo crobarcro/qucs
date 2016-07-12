@@ -75,6 +75,7 @@ circuit::circuit () : object (), integrator () {
   histories = NULL;
   nHistories = 0;
   type = CIR_UNKNOWN;
+  _hasEvents = false;
 }
 
 /* Constructor creates an unnamed instance of the circuit class with a
