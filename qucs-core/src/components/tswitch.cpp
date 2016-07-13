@@ -40,6 +40,10 @@
 #include "component.h"
 #include "tswitch.h"
 
+#define QUCS_TT_ABRUPT 0
+#define QUCS_TT_LINEAR 1
+#define QUCS_TT_SPLINE 2
+
 using namespace qucs;
 
 tswitch::tswitch () : circuit (2) {
@@ -105,99 +109,143 @@ void tswitch::initTR (void) {
   nr_double_t maxduration = getPropertyDouble("MaxDuration");
   duration = std::min ( std::max (10*NR_TINY, values->minimum() / 100),
                         maxduration );
+  ron = getPropertyDouble ("Ron");
+  roff = getPropertyDouble ("Roff");
+
+  const char * const trans_type = getPropertyString ("Transition");
+
+  const char * const init = getPropertyString ("init");
+
+  _initstate = !strcmp (init, "on");
+
+  if (!strcmp(trans_type, "abrupt"))
+  {
+    _trans_type = QUCS_TT_ABRUPT;
+  }
+  else if (!strcmp(trans_type, "linear"))
+  {
+    _trans_type = QUCS_TT_LINEAR;
+  }
+  else if (!strcmp(trans_type, "spline"))
+  {
+    _trans_type = QUCS_TT_SPLINE;
+  }
+  else
+  {
+      // \todo error for bad transition type
+    _trans_type = QUCS_TT_ABRUPT;
+  }
+
   initDC ();
 }
 
 void tswitch::calcTR (nr_double_t t) {
-  const char * const init = getPropertyString ("init");
-  nr_double_t ron = getPropertyDouble ("Ron");
-  nr_double_t roff = getPropertyDouble ("Roff");
-  const char * const trans_type = getPropertyString ("Transition");
-  nr_double_t r = 0;
-  nr_double_t rdiff = 0;
-  //nr_double_t s_i = 0;
-  nr_double_t r_0 = 0;
-  qucs::vector * values = getPropertyVector ("time");
-  bool on = !strcmp (init, "on");
-  nr_double_t ti = 0;
 
-  if (repeat) {
-    // if the user enters an even number of switching times
-    // the pattern is repeated continuously. This is achieved by
-    // subtracting an integer number of total switching periods
-    // from the real time
-    t = t - T * qucs::floor (t / T);
-  }
+    nr_double_t r = 0;
+    nr_double_t rdiff = 0;
+    nr_double_t r_0 = 0;
+    qucs::vector * values = getPropertyVector ("time");
+    bool on = _initstate;
+    nr_double_t ti = 0;
 
-  // Initialise the last switching time to be well in the past
-  // to avoid having the switch even partially in a transition
-  // state (due to inaccurately computed time differences)
-  nr_double_t ts = -2*duration;
-
-  // here we determine whether a switching event should occur
-  // by looping through the list of switching times and comparing
-  // to the current time
-  for (int i = 0; i < values->getSize (); i++) {
-    // add the current value from the list of switching times
-    // to a counter
-    ti += real (values->get (i));
-
-    if (t >= ti)
+    if (repeat)
     {
-      // the current time is greater than or equal to the current
-      // sum of switching times so the switch state changes
-      on = !on;
-      // store the current switching time
-      ts = ti;
+        // if the user enters an even number of switching times
+        // the pattern is repeated continuously. This is achieved by
+        // subtracting an integer number of total switching periods
+        // from the real time
+        t = t - T * qucs::floor (t / T);
     }
-    else {
-      // the current sum of switching times is in the future
-      // so exit the loop
-      break;
+
+    // Initialise the last switching time to be well in the past
+    // to avoid having the switch even partially in a transition
+    // state (due to inaccurately computed time differences)
+    nr_double_t ts = -2*duration;
+
+    // here we determine whether a switching event should occur
+    // by looping through the list of switching times and comparing
+    // to the current time
+    for (int i = 0; i < values->getSize (); i++)
+    {
+        // add the current value from the list of switching times
+        // to a counter
+        ti += real (values->get (i));
+
+        if (t >= ti)
+        {
+            // the current time is greater than or equal to the current
+            // sum of switching times so the switch state changes
+            on = !on;
+            // store the current switching time
+            ts = ti;
+        }
+        else
+        {
+            // the current sum of switching times is in the future
+            // so exit the loop
+            break;
+        }
     }
-  }
 
-  if (!strcmp(trans_type, "abrupt")) {
-    r = (on ? ron : roff);
-  } else {
-    // calculate the time since the last switch occurred
-    nr_double_t tdiff = std::max(NR_TINY, t - ts);
-
-    // set the time difference to be no more than the max switch
-    // duration so when we interpolate below we only get the max
-    // or min function value if we are past a switching time
-    if (tdiff > duration) {
-      tdiff = duration;
+    if (_trans_type == QUCS_TT_ABRUPT)
+    {
+        r = (on ? ron : roff);
     }
-    // Set the appropriate resistance.
-    if (on) {
-      r_0 = roff;
-      rdiff = ron - roff;
-      //    s_i = (rdiff) / (duration);
-    } else {
-      r_0 = ron;
-      rdiff = roff - ron;
-      //  s_i = (rdiff) / (duration);
+    else
+    {
+        // calculate the time since the last switch occurred
+        nr_double_t tdiff = std::max(NR_TINY, t - ts);
+
+        // set the time difference to be no more than the max switch
+        // duration so when we interpolate below we only get the max
+        // or min function value if we are past a switching time
+        if (tdiff > duration)
+        {
+            tdiff = duration;
+        }
+        // Set the appropriate resistance.
+        if (on)
+        {
+            r_0 = roff;
+            rdiff = ron - roff;
+            //    s_i = (rdiff) / (duration);
+        }
+        else
+        {
+            r_0 = ron;
+            rdiff = roff - ron;
+            //  s_i = (rdiff) / (duration);
+        }
+
+        if (_trans_type == QUCS_TT_LINEAR)
+        {
+            // simple linear transition over the transition time
+            r = r_0 + rdiff * tdiff / duration;
+        }
+        else
+        {   // assume trans_type is "spline"
+            // the resistance is interpolated along a constrained cubic spline
+            // with zero derivative at the start and end points to ensure a
+            // smooth derivative
+            //r = r_0 + ((3. * s_i * qucs::pow (tdiff,2.0)) / (duration))
+            //        + ((-2. * s_i * qucs::pow (tdiff,3.0)) / qucs::pow (duration, 2.0));
+            // use Horner's rule to reduce the numerical errors
+            r = r_0 + (((-2. * rdiff * tdiff / duration) + 3. * rdiff) * qucs::pow(tdiff/duration, 2.0));
+        }
     }
-    if (!strcmp(trans_type, "linear")) {
-      // simple linear transition over the transition time
-      r = r_0 + rdiff * tdiff / duration;
-    } else { // assume trans_type is "spline"
-	// the resistance is interpolated along a constrained cubic spline
-	// with zero derivative at the start and end points to ensure a
-	// smooth derivative
-	//r = r_0 + ((3. * s_i * qucs::pow (tdiff,2.0)) / (duration))
-	//        + ((-2. * s_i * qucs::pow (tdiff,3.0)) / qucs::pow (duration, 2.0));
-	// use Horner's rule to reduce the numerical errors
-	r = r_0 + (((-2. * rdiff * tdiff / duration) + 3. * rdiff) * qucs::pow(tdiff/duration, 2.0));
-      }
-  }
 
-  // check for (numerical) errors
-  assert(r >= ron);
-  assert(r <= roff);
+    // make sure we are really between ron and roff, and not outside
+    // due to numerical issues in the above calculations
+    if (on)
+    {
+        r = std::max (r, ron);
+    }
+    else
+    {
+        r = std::min (r, roff);
+    }
 
-  setD (VSRC_1, VSRC_1, -r);
+    setD (VSRC_1, VSRC_1, -r);
 }
 
 nr_double_t tswitch::suggestStep (nr_double_t t)
@@ -222,8 +270,18 @@ nr_double_t tswitch::suggestStep (nr_double_t t)
     if (ti > t)
     {
       // stop when the current time is less than the current
-      // sum of switching times
+      // sum of switching times and suggest a delta which takes
+      // us up to the moment when the switch begins it's
+      // transition
       delta = ti - t;
+      break;
+    }
+
+    if ( (_trans_type != TT_ABRUPT ) && ((ti + duration) > t) )
+    {
+      // we're in a switching transition, suggest the next delta
+      // as the end of the switching transition
+      delta = (ti+duration) - t;
       break;
     }
   }

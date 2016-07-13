@@ -43,6 +43,12 @@ class tswitch : public qucs::circuit
   nr_double_t T;
   nr_double_t duration;
   bool repeat;
+  int _trans_type;
+  nr_double_t ron;
+  nr_double_t roff;
+  bool _initstate;
 };
+
+//enum TRANS_TYPE;
 
 #endif /* __TSWITCH_H__ */
