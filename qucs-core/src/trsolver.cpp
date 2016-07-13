@@ -625,13 +625,6 @@ void trsolver::adjustDelta (nr_double_t t)
 {
     deltaOld = delta;
     delta = checkDelta ();
-    // check for smaller suggested delta by circuit components
-    nr_double_t delta_sugg = suggestedDelta ();
-    delta = std::min(delta, delta_sugg);
-    // the next suggested delta should act like a break point
-    // so we calculate the actual time referred to by the
-    // suggested delta
-    nr_double_t t_sugg = current + delta_sugg;
 
     if (delta > deltaMax) delta = deltaMax;
     if (delta < deltaMin) delta = deltaMin;
@@ -642,11 +635,18 @@ void trsolver::adjustDelta (nr_double_t t)
     {
         if (!statConvergence || converged > 64)   /* Is this a good guess? */
         {
+
             // check next breakpoint
             if (stepDelta > 0.0)
             {
+                // stepDelta is set to -1 at the beginning of a simulation, and
+                // is only subsequently changed within this function.
+
                 // restore last valid delta
                 delta = stepDelta;
+
+                // set stepDelta to -1 so we don't come back in here on
+                // the next iteration
                 stepDelta = -1.0;
             }
             else
@@ -654,8 +654,7 @@ void trsolver::adjustDelta (nr_double_t t)
                 // check whether this step will bring too close to a breakpoint
                 //   is ok if the step will go past the breakpoint, this is handled by
                 //   the next branch
-                if (  ( (t - (current + delta) < deltaMin) && ((current + delta) < t) )
-                   || ( (t_sugg - (current + delta) < deltaMin) && ((current + delta) < t_sugg)) )
+                if ( (t - (current + delta) < deltaMin) && ((current + delta) < t) )
                 {
                     // if we take this delta we will end up too close to the breakpoint
                     // and next step will be very tiny, possibly causing numerical issues
@@ -665,19 +664,66 @@ void trsolver::adjustDelta (nr_double_t t)
                 }
                 else
                 {
+
+                    // get delta suggested by circuit components,
+                    // these should act the same way as break points requested by
+                    // the user
+                    nr_double_t delta_sugg = suggestedDelta ();
+
+                    // make sure we hit a requested time point exactly and
+                    // don't step over it
                     if (delta > (t - current) && t > current)
                     {
-                        // save last valid delta and set exact step
+                        // Save last valid delta and set exact step.
+                        // we save the old delta value so it can be reused on the
+                        // next iteration instead of the smaller suggested delta
+                        // forced by needing to hit the desired time point
+                        // Force it's acceptance by setting 'good' to true
+                        // (otherwise if the delta changes a lot here the step is
+                        // marked as rejected)
                         stepDelta = deltaOld;
                         delta = t - current;
                         good = 1;
+
+                        if (delta_sugg < delta)
+                        {
+                            delta = delta_sugg;
+                        }
                     }
                     else
                     {
-                        stepDelta = -1.0;
+                        // we're not goint to hit a requested time point with the
+                        // current value of delta. So check it against the delta
+                        // suggested by the circuit components and reduce if necessary
+                        if (delta_sugg < delta)
+                        {
+                            // use the smaller delta
+                            delta = delta_sugg;
+                            // we save the old delta value so it can be reused on the
+                            // next iteration instead of the smaller suggested delta
+                            // forced by the circuit elements suggestion this time
+                            stepDelta = deltaOld;
+                            good = 1;
+                        }
+                        else
+                        {
+                            // check the current delta will not take us too close to the
+                            // next time step forced by the suggested delta
+                            if (delta_sugg - delta < deltaMin)
+                            {
+                                // should be ok to subtract here as the deltaMin check
+                                // later will prevent us making delta negative or
+                                // or anything like this
+                                delta = delta - 2.0*deltaMin;
+                            }
+                            // set stepDelta to -1, this means that on the next iteration
+                            stepDelta = -1.0;
+                        }
                     }
+
                 }
             }
+
             if (delta > deltaMax) delta = deltaMax;
             if (delta < deltaMin) delta = deltaMin;
         }
