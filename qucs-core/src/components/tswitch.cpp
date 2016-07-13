@@ -277,7 +277,7 @@ nr_double_t tswitch::suggestStep (nr_double_t t)
       break;
     }
 
-    if ( (_trans_type != TT_ABRUPT ) && ((ti + duration) > t) )
+    if ( (_trans_type != QUCS_TT_ABRUPT ) && ((ti + duration) > t) )
     {
       // we're in a switching transition, suggest the next delta
       // as the end of the switching transition
