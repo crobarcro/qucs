@@ -299,7 +299,7 @@ case $host_os in
     if test "$enable_mt" = yes; then
       QT_LDF=""
       QT_LIB="-lQtCore -lQtGui -lQtXml -lQt3Support -lQtSvg -lQtScript"
-      QT_INC="$QT_DEF -DQT3_SUPPORT -DQT3_SUPPORT_WARNINGS -DQT_THREAD_SUPPORT -D_REENTRANT"
+      QT_INC="$QT_DEF -DQT3_SUPPORT -DQT3_SUPPORT_WARNINGS -DQT_DEPRECATED_WARNINGS -DQT_THREAD_SUPPORT -D_REENTRANT"
       [case $host_os in
         *freebsd*) QT_LIB="$QT_LIB -pthread" ;;
         *mingw* | *msys*) QT_INC="$QT_INC -mthreads"; QT_LDF="$QT_LDF -mthreads" ;;
@@ -381,11 +381,11 @@ case $host_os in
     dnl Check for Qt in:
     dnl  * Digia default path: /Library/Frameworks
     dnl  * User provided path: QTDIR
-    dnl  * Homebrew defaul:    /usr/local/lib
-    dnl  * MacpPorts default   /opt/local/lib
+    dnl  * Homebrew defaul:    /usr/local/lib or ${prefix}/Library/Frameworks
+    dnl  * MacpPorts default   /opt/local/lib or ${prefix}/Library/Frameworks
     with_qt=no
     AC_MSG_CHECKING([for Qt OS X framework])
-    paths="$QTDIR/lib /Library/Frameworks /opt/local/lib /usr/local/lib"
+    paths="$QTDIR/lib ${prefix}/Library/Frameworks /Library/Frameworks /opt/local/lib /usr/local/lib"
     for path in $paths; do
       if test -f "$path/QtGui.framework/Headers/QApplication"; then
         with_qt=yes
@@ -406,14 +406,15 @@ case $host_os in
       CPPFLAGS="$CPPFLAGS -I$path/QtSvg.framework/Headers"
       CPPFLAGS="$CPPFLAGS -I$path/QtScript.framework/Headers"
       CPPFLAGS="$CPPFLAGS -I$path/Qt3Support.framework/Headers"
+      QT_LDFLAGS="$QT_LDFLAGS -F$path"
     else
       AC_MSG_ERROR([not found])
     fi
 
     dnl Define Qt3Support
-    QT_DEF="-DQT_SHARED -DQT3_SUPPORT"
+    QT_DEF="-DQT_SHARED -DQT3_SUPPORT -DQT3_SUPPORT_WARNINGS -DQT_DEPRECATED_WARNINGS"
     CPPFLAGS="$CPPFLAGS $QT_DEF"
-    QT_LDFLAGS="-headerpad_max_install_names"
+    QT_LDFLAGS="$QT_LDFLAGS -headerpad_max_install_names"
 
     if test "$enable_qucs_gui_debug" = yes; then
       CPPFLAGS="$CPPFLAGS -W -Wall"
@@ -568,7 +569,7 @@ case $host_os in
     DEVELOPER_DIR="${MACOSX_SDK_PATH%/SDKs*}"
     DEVELOPER_DIR="${DEVELOPER_DIR%/Platforms*}"
     export DEVELOPER_DIR
-    FRAMEWORKSHOME="$MACOSX_SDK_PATH/System/Library/Frameworks"
+    FRAMEWORKSHOME="${prefix}/Library/Frameworks"
     MACOSX_DEPLOYMENT_TARGET="$with_macosx_version_min_required"
 
     case "$with_macosx_version_min_required" in
@@ -707,22 +708,18 @@ AC_PATH_PROGS(LUPDATE, lupdate-qt4 lupdate, :, [$QT_DIR/bin:$PATH])
 dnl Check for MOC/UIC/RCC support.
 AC_PATH_PROGS(MOC, moc-qt4 moc, :, [$QT_DIR/bin:$PATH])
 AC_PATH_PROGS(UIC, uic-qt4 uic, :, [$QT_DIR/bin:$PATH])
-AC_PATH_PROGS(RCC, rcc, :, [$QT_DIR/bin:$PATH])
+AC_PATH_PROGS(RCC, rcc-qt4 rcc, :, [$QT_DIR/bin:$PATH])
 
 if test "$MOC" = ":"; then
-  AC_MSG_ERROR([
-  The $PACKAGE package needs the 'Qt Meta Object Compiler' to compile properly.
-  Though Qt itself may be properly installed including headers and libraries
-  the 'moc' program is missing.  Possibly you need to install the full
-  development package of Qt.])
+  AC_MSG_ERROR([Need 'moc' to compile, 'moc' is part of Qt])
 fi
 
 if test "$UIC" = ":"; then
-  AC_MSG_ERROR([
-  The $PACKAGE package needs the 'Qt User Interface Compiler' to compile properly.
-  Though Qt itself may be properly installed including headers and libraries
-  the 'uic' program is missing.  Possibly you need to install the full
-  development package of Qt.])
+  AC_MSG_ERROR([Need 'uic' to compile, 'uic' is part of Qt])
+fi
+
+if test "$RCC" = ":"; then
+  AC_MSG_ERROR([Need 'rcc' to compile, 'rcc' is part of Qt])
 fi
 
 dnl check for Qt moveable tabwidgets (introduced in Qt 4.5)
@@ -787,27 +784,20 @@ AH_TOP([
 dnl Add here all your Makefiles. These are created by configure.
 AC_CONFIG_FILES([Makefile
     contrib/Makefile
+    man/Makefile
     examples/Makefile
-    qucs-edit/Makefile
-    qucs-help/Makefile
-    qucs-help/docs/Makefile
-    qucs-help/docs/en/Makefile
-    qucs-help/docs/de/Makefile
-    qucs-help/docs/es/Makefile
-    qucs-help/docs/fr/Makefile
-    qucs-help/docs/ru/Makefile
-    qucs-help/docs/uk/Makefile
-    qucs-help/docs/cs/Makefile
-    qucs-help/docs/pt/Makefile
     qucs-filter/Makefile
     qucs-activefilter/Makefile
     qucs-transcalc/Makefile
+    qucs-transcalc/bitmaps/Makefile
     qucs-transcalc/examples/Makefile
     qucs-lib/Makefile
     qucs-lib/library/Makefile
     qucs-attenuator/Makefile
+    qucs-attenuator/bitmaps/Makefile
     qucs-rescodes/Makefile
     qucs/Makefile
+    qucs/bitmaps/Makefile
     qucs/octave/Makefile
     qucs/components/Makefile
     qucs/diagrams/Makefile

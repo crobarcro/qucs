@@ -19,6 +19,9 @@
  * \Declaration of some miscellaneous function
  */
 
+#include <QWidget>
+#include <QPalette>
+
 class QString;
 
 namespace misc {
@@ -27,7 +30,7 @@ namespace misc {
   QString complexRad (double, double, int Precision=3);
   QString StringNum  (double, char form='g', int Precision=3);
   void    str2num    (const QString&, double&, QString&, double&);
-  QString num2str    (double);
+  QString num2str    (double, int Precision=6, QString unit="");
   QString StringNiceNum(double);
   void    convert2Unicode(QString&);
   void    convert2ASCII(QString&);
@@ -40,6 +43,15 @@ namespace misc {
   bool    Verilog_Delay(QString&, const QString&);
   QString Verilog_Param(const QString);
   bool    checkVersion(QString&);
+
+  inline void setWidgetBackgroundColor(QWidget *q, const QColor &c)
+  { QPalette p ; p.setColor(q->backgroundRole(), c); q->setPalette(p); }
+
+  inline const QColor getWidgetBackgroundColor(const QWidget *q)
+  { return q->palette().color(q->backgroundRole()); }
+
+  inline void setWidgetForegroundColor(QWidget *q, const QColor &c)
+  { QPalette p = q->palette(); p.setColor(q->foregroundRole(), c); q->setPalette(p); }
 }
 
 /*! handle the application version string

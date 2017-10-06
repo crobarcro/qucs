@@ -23,12 +23,11 @@
 #
 
 SUBDIRS = \
+  man \
   qucs \
 	qucs-activefilter \
 	qucs-attenuator \
-	qucs-edit \
 	qucs-filter \
-	qucs-help \
 	qucs-lib \
 	qucs-rescodes \
 	qucs-transcalc \
@@ -37,7 +36,8 @@ SUBDIRS = \
 	examples \
 	$(RELEASEDIRS)
 
-EXTRA_DIST = ar-lib bootstrap depcomp PLATFORMS RELEASE Info.plist
+EXTRA_DIST = ar-lib bootstrap depcomp PLATFORMS RELEASE Info.plist \
+	common.mk
 
 # MacOSX specific installation of applications
 if COND_MACOSX
@@ -45,7 +45,6 @@ app_PROGS = $(top_builddir)/qucs/qucs \
   $(top_builddir)/qucs-attenuator/qucsattenuator \
   $(top_builddir)/qucs-filter/qucsfilter \
   $(top_builddir)/qucs-activefilter/qucsactivefilter \
-  $(top_builddir)/qucs-help/qucshelp \
   $(top_builddir)/qucs-lib/qucslib \
   $(top_builddir)/qucs-edit/qucsedit \
   $(top_builddir)/qucs-rescodes/qucsrescodes \
@@ -67,7 +66,6 @@ mac-install-apps:
 	  qucsattenuator) desc="Qucs Attenuator";; \
 	  qucsfilter)	  desc="Qucs Filter";; \
 	  qucsactivefilter)	  desc="Qucs Active Filter";; \
-	  qucshelp)	  desc="Qucs Help";; \
 	  qucslib)	  desc="Qucs Library";; \
 	  qucsedit)	  desc="Qucs Editor";; \
 	  qucrescodes)	  desc="Qucs Resistor codes";; \
