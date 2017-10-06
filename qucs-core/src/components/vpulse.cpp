@@ -35,6 +35,7 @@ vpulse::vpulse () : circuit (2) {
   type = CIR_VPULSE;
   setVSource (true);
   setVoltageSources (1);
+  _hasEvents = true;
 }
 
 void vpulse::initSP (void) {
@@ -86,6 +87,33 @@ void vpulse::calcTR (nr_double_t t) {
     ut = u1;
   }
   setE (VSRC_1, ut * s);
+}
+
+nr_double_t vpulse::suggestStep (nr_double_t t)
+{
+  nr_double_t t1 = getPropertyDouble ("T1");
+  nr_double_t t2 = getPropertyDouble ("T2");
+  nr_double_t tr = getPropertyDouble ("Tr");
+  nr_double_t tf = getPropertyDouble ("Tf");
+
+  // default delta is far in the future
+  nr_double_t delta = std::numeric_limits<nr_double_t>::max();
+
+  if (t < t1) { // before pulse start
+    delta = t1 - t;
+  }
+  else if (t < (t1 + tr)) { // transition from rising to flat
+    delta = (t1 + tr) - t;
+  }
+  else if (t < (t2 - tf)) { // transition from flat to falling
+    delta = (t2 + tf) - t;
+  }
+  else if (t < t2) { // end of fall
+    delta = t2 - t;
+  }
+
+  return delta;
+
 }
 
 // properties

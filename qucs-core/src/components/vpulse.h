@@ -34,6 +34,7 @@ class vpulse : public qucs::circuit
   void initAC (void);
   void initTR (void);
   void calcTR (nr_double_t);
+  nr_double_t suggestStep (nr_double_t);
 };
 
 #endif /* __VPULSE_H__ */
